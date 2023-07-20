@@ -1,6 +1,11 @@
 {
+	"workspaces": [
+		"client",
+		"server",
+		"common"
+	],
+	"private": true,
 	"dependencies": {
-		"left-pad": "^1.3.0",
-		"ts-adt": "github:pfgray/ts-adt"
+		"node-sass": "^9.0.0"
 	}
 }

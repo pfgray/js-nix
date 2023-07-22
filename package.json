@@ -1,11 +1,6 @@
 {
-	"workspaces": [
-		"client",
-		"server",
-		"common"
-	],
-	"private": true,
-	"dependencies": {
-		"node-sass": "^9.0.0"
-	}
+  "workspaces": [
+    "packages/*"
+  ],
+  "private": true
 }

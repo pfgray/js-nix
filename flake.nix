@@ -5,32 +5,45 @@
   };
 
   outputs = { flake-utils, nixpkgs, ... }:
-  # Now eachDefaultSystem is only using ["x86_64-linux"], but this list can also
-  # further be changed by users of your flake.
-  flake-utils.lib.eachDefaultSystem (system: 
-  let pkgs = import nixpkgs {
-    inherit system;
-  }; in {
-    devShell = pkgs.mkShell {
-      packages = with pkgs; [
-        nodejs.pkgs.pnpm
-        pkgs.nodejs-18_x
-      ];
-    };
-    packages = let
+    # Now eachDefaultSystem is only using ["x86_64-linux"], but this list can also
+    # further be changed by users of your flake.
+    flake-utils.lib.eachDefaultSystem (system:
+      let
+        pkgs = import nixpkgs {
+          inherit system;
+        }; 
+        convert = pkgs.writeShellScriptBin "convert" ''
+          ${pkgs.yq-go}/bin/yq -o=json eval pnpm-lock.yaml > pnpm-lock.json
+        '';
+      in {
+        
+        devShell = pkgs.mkShell {
+          packages = with pkgs; [
+            nodejs.pkgs.pnpm
+            pkgs.nodejs-18_x
+            convert
+          ];
+        };
+        packages = let
 
-      deps =  builtins.fromJSON (builtins.readFile ./pnpm-lock.json);
+          mkNodeModule = pkgs.callPackage ./mk-node-module.nix {};
+          mkWorkspace = pkgs.callPackage ./mk-workspace.nix {};
 
-      thing = pkgs.lib.attrsets.mapAttrs (name: dep: (builtins.trace (builtins.attrNames dep)) {
-      }) deps.dependencies;
+          # js-packages = import ./js-packages.nix;
+          # js-packages-by-name = builtins.mapAttrs (name: builtins.head) (builtins.groupBy (pkg: pkg.name) js-packages.packages);
+          # js-builds = pkgs.lib.attrsets.mapAttrs (name: dep: mkNodeModule js-packages.packages dep) ((builtins.trace (builtins.attrNames js-packages-by-name)) js-packages-by-name);
 
-      mkNodeModule = pkgs.callPackage ./mk-node-module.nix {};
-      js-packages = import ./js-packages.nix;
+          workspaces = mkWorkspace {
+            lockfile = ./pnpm-lock.json;
+          };
 
-      js-packages-by-name = builtins.mapAttrs (name: builtins.head) (builtins.groupBy (pkg: pkg.name) js-packages.packages);
+          packages = builtins.mapAttrs (name: builtins.mapAttrs (name: (mkNodeModule workspaces.all))) workspaces;
 
-      js-builds = pkgs.lib.attrsets.mapAttrs (name: dep: mkNodeModule js-packages.packages dep) ((builtins.trace (builtins.attrNames js-packages-by-name)) js-packages-by-name);
-
-    in js-builds;
-  });
+        in {
+          inherit workspaces packages;
+          packagesList = builtins.mapAttrs (name: builtins.attrNames) packages;
+          foo = packages.remote.ts-adt;
+          # remotePackages = packages.
+        };
+      });
 }

@@ -2,53 +2,32 @@
 
 let
 
-  buildGitModule = pkg: stdenv.mkDerivation {
-    name = "${pkg.name}-${pkg.version}";
-    buildInputs = [nodejs];
-    src = pkg.src;
-    buildPhase = ''
-      export HOME=$(pwd)
-
-      if ${hasScript "postinstall"}; then
-        npm run-script postinstall
-      fi
-
-      npm pack
-
-      mkdir $out
-      tar -xf ${pkg.name}-${pkg.version}.tgz -C $out
-      mv $out/package/* $out/
-      rm -rf $out/package
-    '';
-  };
-
   hasScript = scriptName: "test \"$(${jq}/bin/jq -e -r '.scripts | .${scriptName} | length' < package.json)\" -gt 0";
 
   # makes a node module for
-  mkNpmNodeModule = pkgs: pkg:
+  mkRemoteNodeModule = pkgset: pkg:
     let
-      tarball = (lib.lists.last (lib.splitString "/" pkg.name)) + "-" + pkg.version + ".tgz";
-      url = "https://registry.npmjs.org/${pkg.name}/-/${tarball}";
+      #  pkgs = builtins.attrValues pkgset;
+      #  tarball = (lib.lists.last (lib.splitString "/" pkg.name)) + "-" + pkg.version + ".tgz";
+      #  url = "https://registry.npmjs.org/${pkg.name}/-/${tarball}";
 
-      findPkgByNameAndVersion = pkgInfo: lib.findFirst (pkg: pkg.name == pkgInfo.name && pkg.version == pkgInfo.version) pkgInfo pkgs;
+      #  findPkgByNameAndVersion = name: version: (lib.findFirst (pkg: pkg.name == name && pkg.version == version) 5 pkgs);
 
-      linkDep = node_modules_folder: pkg: ''
-        ln -s ${mkNodeModule pkg} ${node_modules_folder}/${pkg.name}
-      '';
+      # linkDep = node_modules_folder: pkg: ''
+      #   ln -s ${mkNodeModule pkg} ${node_modules_folder}/${pkg.name}
+      # '';
 
-      linkDeps = node_modules_folder: builtins.concatStringsSep ("\n") (
-        builtins.map (linkDep node_modules_folder) (
-          builtins.map findPkgByNameAndVersion pkg.deps
-        )
-      );
+      # linkDeps = node_modules_folder: builtins.trace pkgs (builtins.concatStringsSep ("\n") (
+      #   builtins.map (linkDep node_modules_folder) (
+      #     builtins.mapAttrs findPkgByNameAndVersion (builtins.trace (pkg.dependencies) pkg.dependencies)
+      #   )
+      # ));
+      linkDeps = foo: "echo 'success'";
     in stdenv.mkDerivation {
       name = "${pkg.name}-${pkg.version}";
-      src = fetchurl {
-        url = url;
-        hash = pkg.hash;
-      };
+      src = pkg.src;
 
-    buildInputs = [nodejs];
+      buildInputs = [nodejs];
 
       installPhase = ''
         mkdir node_modules
@@ -69,38 +48,6 @@ let
       '';
     };
 
-  mkGitNodeModule = pkg: stdenv.mkDerivation {
-    name = "${pkg.name}-${pkg.version}";
-    buildInputs = [nodejs];
-    src = fetchurl {
-      name = "${pkg.name}.tgz";
-      url = pkg.url;
-      hash = pkg.hash;
-    };
-    buildPhase = ''
-      export HOME=$(pwd)
-
-      if ${hasScript "preinstall"}; then
-        npm run-script preinstall
-      fi
-
-      if ${hasScript "install"}; then
-        npm run-script install
-      fi
-
-      if ${hasScript "postinstall"}; then
-        npm run-script postinstall
-      fi
-
-      npm pack
-
-      mkdir $out
-      tar -xf ${pkg.name}-${pkg.version}.tgz -C $out
-      mv $out/package/* $out/
-      rm -rf $out/package
-    '';
-  };
-
   mkLocalNodeModule = pkg: stdenv.mkDerivation {
     name = "${pkg.name}-${pkg.version}";
     buildInputs = [nodejs];
@@ -110,6 +57,40 @@ let
     '';
   };
 
-  mkNodeModule = pkgs: pkg: builtins.trace (pkg.type)
-    (if pkg.type == "node" then (mkNpmNodeModule pkgs pkg) else mkGitNodeModule pkg);
+  mkNodeModule = pkgs: pkg:
+    (if pkg.type == "remote" then (mkRemoteNodeModule pkgs pkg) else mkLocalNodeModule pkg);
 in mkNodeModule
+
+
+
+  # mkGitNodeModule = pkg: stdenv.mkDerivation {
+  #   name = "${pkg.name}-${pkg.version}";
+  #   buildInputs = [nodejs];
+  #   src = fetchurl {
+  #     name = "${pkg.name}.tgz";
+  #     url = pkg.url;
+  #     hash = pkg.hash;
+  #   };
+  #   buildPhase = ''
+  #     export HOME=$(pwd)
+
+  #     if ${hasScript "preinstall"}; then
+  #       npm run-script preinstall
+  #     fi
+
+  #     if ${hasScript "install"}; then
+  #       npm run-script install
+  #     fi
+
+  #     if ${hasScript "postinstall"}; then
+  #       npm run-script postinstall
+  #     fi
+
+  #     npm pack
+
+  #     mkdir $out
+  #     tar -xf ${pkg.name}-${pkg.version}.tgz -C $out
+  #     mv $out/package/* $out/
+  #     rm -rf $out/package
+  #   '';
+  # };

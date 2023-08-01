@@ -2,9 +2,11 @@
   "name": "@test/common",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsc"
   },
   "author": "",
   "license": "ISC",
@@ -13,7 +15,6 @@
     "ts-adt": "^2.1.2"
   },
   "devDependencies": {
-    "gbt": "^0.0.3",
     "typescript": "^5.1.6"
   }
 }

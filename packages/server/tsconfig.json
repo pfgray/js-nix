@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "sourceRoot": "./src",
+    "sourceMap": true,
+    "outDir": "lib",
+    "target": "es5",
+    "lib": ["es6", "DOM"],
+    "declaration": true,
+    "strict": true,
+    "inlineSources": true
+  },
+  "files": ["./src/index.ts"],
+}

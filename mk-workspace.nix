@@ -18,11 +18,13 @@ let
       parts = builtins.filter (p: p != "") (lib.splitString "@" pkgName);
       name = if lib.strings.hasPrefix "@" pkgName then "@" + (builtins.head parts) else (builtins.head parts);
       fullVersion = builtins.substring (builtins.stringLength name + 1) (builtins.stringLength pkgName) pkgName;
-      version = builtins.head (lib.splitString "(" fullVersion);
+      version = extractVersion fullVersion;
     in {
       inherit version;
-      name = builtins.trace ("built package: ${name} --- ${version}") name;
+      name = name;
     };
+
+  extractVersion = versionStr: builtins.head (lib.splitString "(" versionStr);
 
   srcForIntegrity = {name, version, pkg, ...}: (
     let
@@ -44,6 +46,16 @@ let
 
   printPackage = pkg: "${pkg.name} - ${pkg.version} (${builtins.toString (builtins.length (lib.attrsets.attrValues pkg.dependencies))} deps)}))";
 
+  formatDependencies = builtins.mapAttrs (name: value: {
+    inherit name;
+    version = extractVersion(
+      if builtins.typeOf value == "string" then value
+      else (
+        if lib.strings.hasPrefix "link:" value.version then value.specifier else value.version
+      )
+    );
+  });
+
   # makes a node module for
   mkWorkspace = { lockfile }:
     let
@@ -53,10 +65,6 @@ let
           packageDef = lib.importJSON (./. + "/${nameKey}" + /package.json);
           name = packageDef.name;
           version = packageDef.version;
-          formatDependencies = builtins.mapAttrs (name: value: {
-            inherit name;
-            version = if lib.strings.hasPrefix "link:" value.version then value.specifier else value.version;
-          });
           dependencies = (formatDependencies value.dependencies);
           devDependencies = (formatDependencies value.devDependencies);
         in {
@@ -74,11 +82,11 @@ let
             let 
               pkgInfo = extractNameAndVersion (removeFirstChar nameKey);
             in {
-              ${pkgInfo.name} = {
+              "${pkgInfo.name}@${pkgInfo.version}" = {
                 type = "remote";
                 inherit (pkgInfo) name version;
                 src = srcForPackage {inherit (pkgInfo) name version; pkg = value;};
-                dependencies = if builtins.hasAttr "dependencies" value then value.dependencies else {};
+                dependencies = if builtins.hasAttr "dependencies" value then (formatDependencies value.dependencies) else {};
               };
             }
         ) packages.packages

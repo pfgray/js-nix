@@ -73,20 +73,21 @@ const readPackageJson = (pkgJsonPath: string) =>
   );
 
 // /@effect-ts/tracing-utils@0.3.0(typescript@5.1.6)
-const extractNameAndVersionFromPackageKey = (
+export const extractNameAndVersionFromPackageKey = (
   packageKeyIn: string
 ): { name: string; version: string } => {
+  console.log(`extracting name from: {${packageKeyIn}}`);
   // remove first slash
   const packageKey = packageKeyIn.substring(1, packageKeyIn.length);
   const parts = packageKey.split("@");
   return packageKey.startsWith("@")
     ? {
         name: `@${parts[1]}`,
-        version: parts[2],
+        version: parts[2].split("(")[0],
       }
     : {
         name: parts[0],
-        version: parts[1],
+        version: parts[1].split("(")[0],
       };
 };
 
@@ -102,7 +103,8 @@ const srcForPackage = (
     throw new Error("Commit not supported (TODO)");
     // return resolution.repo;
   } else {
-    const tarball = `${name.split("/")[name.length - 1]}-${version}.tgz`;
+    const parts = name.split("/");
+    const tarball = `${parts[parts.length - 1]}-${version}.tgz`;
     return {
       url: `https://registry.npmjs.org/${name}/-/${tarball}`,
       hash: resolution.integrity,

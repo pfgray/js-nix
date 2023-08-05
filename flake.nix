@@ -12,6 +12,7 @@
         pkgs = import nixpkgs {
           inherit system;
         }; 
+        js-nix = pkgs.callPackage ./js-nix {};
         convert = pkgs.writeShellScriptBin "convert" ''
           ${pkgs.yq-go}/bin/yq -o=json eval pnpm-lock.yaml > pnpm-lock.json
         '';
@@ -41,6 +42,7 @@
 
         in {
           inherit workspaces packages;
+          inherit (js-nix) js-nix;
           packagesList = builtins.mapAttrs (name: builtins.attrNames) packages;
           foo = packages.remote.ts-adt;
           # remotePackages = packages.

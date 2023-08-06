@@ -13,14 +13,12 @@ let
 
   linkDeps = pkgset: node_modules_folder: pkg:
     let
-      pkgs = (builtins.attrValues pkgset);
+      pkgs = (builtins.attrValues (pkgset));
 
-      # pkgNames = lib.debug.traceValSeq (builtins.map (p: p.name) pkgs);
-
-      findPkgByNameAndVersion = name: dep: builtins.trace ("finding by name: ${name}") (
+      findPkgByNameAndVersion = name: version: (
         lib.findFirst 
-          (pkg: pkg.name == dep.name && pkg.version == dep.version)
-          (throw "Package ${dep.name}@${dep.version} (a dependency of ${packageStr pkg}) wasn't found in")
+          (pkg: pkg.name == name && pkg.version == version)
+          (throw "Package ${name}@${version} (a dependency of ${packageStr pkg}) wasn't found in the resolved package set. Do you need to re-run js-nix?")
           pkgs
       );
 
@@ -33,17 +31,23 @@ let
           bins =
             if builtins.hasAttr "bin" pkgJson
               then
-                lib.attrsets.attrValues (
-                  lib.attrsets.mapAttrs (name: path: "${nm}/${path}") pkgJson.bin
-                )
+                if builtins.isString pkgJson.bin
+                  then
+                    ["${nm}/${pkgJson.bin}"]
+                  else
+                    if builtins.isAttrs pkgJson.bin
+                      then
+                        lib.attrsets.attrValues (
+                          lib.attrsets.mapAttrs (name: path: "${nm}/${path}") pkgJson.bin
+                        )
+                      else throw ("Package ${packageStr pkg} has a bin section in package.json, but it's not a string or an object.")
               else [];
           binFolder = node_modules_folder + "/.bin";
         in {
-          binLinksCmd = scriptLines (
-            builtins.map (bin: ''
+          binLinksCmd =
+            scriptLines (builtins.map (bin: (''
               ln -s ${bin} ${binFolder}/${builtins.baseNameOf bin}
-            '') bins
-          );
+            '')) bins);
           moduleLinkCmd = ''
             # ensure directories here
             mkdir -p ${node_modules_folder}/${removeLastPathSegment pkg.name}
@@ -52,13 +56,17 @@ let
           '';
         };
 
-    moduleLinks = builtins.map (linkDep node_modules_folder) (
-      (builtins.attrValues (builtins.mapAttrs (findPkgByNameAndVersion) pkg.dependencies))
-    );
+      moduleLinks = builtins.map (linkDep node_modules_folder) (
+        (builtins.attrValues (builtins.mapAttrs (findPkgByNameAndVersion) pkg.dependencies))
+      );
+
+      moduleLinkCmds = scriptLines (builtins.map (ml: ml.moduleLinkCmd) (moduleLinks));
+      binLinkCmds = scriptLines (builtins.map (ml: ml.binLinksCmd) (moduleLinks));
+      
     in ''
       mkdir -p ${node_modules_folder}/.bin
-      ${scriptLines (builtins.map (ml: ml.moduleLinkCmd) (moduleLinks))}
-      ${scriptLines (builtins.map (ml: ml.binLinksCmd) (moduleLinks))}
+      ${moduleLinkCmds}
+      ${binLinkCmds}
     '';
 
   mkRemoteNodeModule = pkgset: pkg:
@@ -94,7 +102,7 @@ let
       replaceSlashes = str: builtins.replaceStrings ["/"] ["-"] str;
       removeFirstAtSign = str: if lib.strings.hasPrefix "@" str then substringFrom 1 str else str;
       fixName = name: removeFirstAtSign (replaceSlashes name);
-    in stdenv.mkDerivation {
+    in builtins.trace (builtins.toString pkg.src) (stdenv.mkDerivation {
       name = "${pkg.name}-${pkg.version}";
       buildInputs = [nodejs];
       src = pkg.src;
@@ -114,40 +122,8 @@ let
         mkdir -p $out/node_modules
         cp -R node_modules/* $out/node_modules
       '';
-    };
+    });
 
   mkNodeModule = pkgs: pkg:
     (if pkg.type == "remote" then (mkRemoteNodeModule pkgs pkg) else mkLocalNodeModule pkgs pkg);
 in mkNodeModule
-
-  # mkGitNodeModule = pkg: stdenv.mkDerivation {
-  #   name = "${pkg.name}-${pkg.version}";
-  #   buildInputs = [nodejs];
-  #   src = fetchurl {
-  #     name = "${pkg.name}.tgz";
-  #     url = pkg.url;
-  #     hash = pkg.hash;
-  #   };
-  #   buildPhase = ''
-  #     export HOME=$(pwd)
-
-  #     if ${hasScript "preinstall"}; then
-  #       npm run-script preinstall
-  #     fi
-
-  #     if ${hasScript "install"}; then
-  #       npm run-script install
-  #     fi
-
-  #     if ${hasScript "postinstall"}; then
-  #       npm run-script postinstall
-  #     fi
-
-  #     npm pack
-
-  #     mkdir $out
-  #     tar -xf ${pkg.name}-${pkg.version}.tgz -C $out
-  #     mv $out/package/* $out/
-  #     rm -rf $out/package
-  #   '';
-  # };

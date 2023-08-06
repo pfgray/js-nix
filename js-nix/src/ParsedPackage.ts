@@ -16,5 +16,3 @@ export type ParsedPackage = {
       };
     }
 );
-
-// https://registry.npmjs.org/${name}/-/${tarball}

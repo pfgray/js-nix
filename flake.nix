@@ -34,18 +34,28 @@
           # js-packages-by-name = builtins.mapAttrs (name: builtins.head) (builtins.groupBy (pkg: pkg.name) js-packages.packages);
           # js-builds = pkgs.lib.attrsets.mapAttrs (name: dep: mkNodeModule js-packages.packages dep) ((builtins.trace (builtins.attrNames js-packages-by-name)) js-packages-by-name);
 
-          workspaces = mkWorkspace {
-            lockfile = ./pnpm-lock.json;
-          };
+          workspaces = (mkWorkspace {
+            lockfile = ./js-nix-lock.json;
+            context = ./.;
+          });
+          
+          jsPackages = builtins.mapAttrs (
+            name: builtins.mapAttrs (name: mkNodeModule workspaces.all)
+          ) workspaces;
 
-          packages = builtins.mapAttrs (name: builtins.mapAttrs (name: (mkNodeModule workspaces.all))) workspaces;
+          local = pkgs.lib.attrsets.concatMapAttrs (
+            name: value: {
+              ${value.name} = mkNodeModule workspaces.all value;
+            }
+          ) workspaces.local;
 
         in {
-          inherit workspaces packages;
-          inherit (js-nix) js-nix;
-          packagesList = builtins.mapAttrs (name: builtins.attrNames) packages;
-          foo = packages.remote.ts-adt;
+          # inherit packages;
+          # inherit (js-nix) js-nix;
+          js-nix = js-nix.js-nix;
+          foo = jsPackages.all.${"ts-adt@2.1.2"};
+          # packagesList = builtins.mapAttrs (name: builtins.attrNames) packages;
           # remotePackages = packages.
-        };
+        } // local;
       });
 }

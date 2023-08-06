@@ -17,7 +17,6 @@ import {
   PackageResolution,
   PnpmLockSchema,
 } from "./pnpmYaml";
-import { ParsedPackage } from "../../ParsedPackage";
 import { parseJson } from "../../parseJson";
 import { PackageJsonSchema } from "../../PackageJson";
 import { flow } from "effect/Function";
@@ -25,7 +24,9 @@ import { read } from "fs";
 import { taggedError } from "../../taggedError";
 import { formatErrors } from "@effect/schema/TreeFormatter";
 
-const fixVersionStr = (versionString: string) => versionString.split("(")[0];
+const fixVersionStr = (versionString: string) => {
+  return versionString.split("(")[0];
+};
 
 const formatDependencies = (
   pathName: string,
@@ -76,7 +77,6 @@ const readPackageJson = (pkgJsonPath: string) =>
 export const extractNameAndVersionFromPackageKey = (
   packageKeyIn: string
 ): { name: string; version: string } => {
-  console.log(`extracting name from: {${packageKeyIn}}`);
   // remove first slash
   const packageKey = packageKeyIn.substring(1, packageKeyIn.length);
   const parts = packageKey.split("@");
@@ -106,6 +106,7 @@ const srcForPackage = (
     const parts = name.split("/");
     const tarball = `${parts[parts.length - 1]}-${version}.tgz`;
     return {
+      name: tarball,
       url: `https://registry.npmjs.org/${name}/-/${tarball}`,
       hash: resolution.integrity,
     };
@@ -115,38 +116,54 @@ const srcForPackage = (
 export const parsePnpmLock = pipe(
   readUtf8File("pnpm-lock.yaml"),
   Effect.flatMap(parseYaml),
-  Effect.flatMap((lockFileRaw) =>
-    pipe(
+  Effect.flatMap((lockFileRaw) => {
+    console.log("Uhhh", JSON.stringify(lockFileRaw as any, null, 2));
+    return pipe(
       S.parse(PnpmLockSchema)(lockFileRaw, { onExcessProperty: "ignore" }),
       Effect.mapError(taggedError("ParsePnpmLockError"))
-    )
-  ),
-  Effect.map((lockFile) => ({ lockFile })),
+    );
+  }),
+  Effect.map((lockFile) => {
+    console.log(
+      "Got dependencies",
+      JSON.stringify(lockFile.packages["/yargs@16.2.0"], null, 2)
+    );
+    return { lockFile };
+  }),
   Effect.bind("local", ({ lockFile }) =>
     pipe(
       lockFile.importers,
       ReadonlyRecord.toEntries,
       Effect.forEach(([pathName, deps]) => {
-        return pipe(
-          Effect.Do,
-          Effect.bind("pkgJson", () =>
-            readPackageJson(path.join(pathName, "/package.json"))
-          ),
-          Effect.bind("dependencies", () =>
-            formatDependencies(
-              pathName,
-              Object.assign({}, deps.devDependencies, deps.dependencies)
-            )
-          ),
-          Effect.map(({ pkgJson, dependencies }) => ({
-            type: "local" as const,
-            src: path.join(".", pathName),
-            name: pkgJson.name,
-            version: pkgJson.version,
-            dependencies: dependencies,
-          }))
-        );
-      })
+        return pathName === "."
+          ? Effect.succeed([])
+          : pipe(
+              Effect.Do,
+              Effect.bind("pkgJson", () =>
+                readPackageJson(path.join(pathName, "/package.json"))
+              ),
+              Effect.bind("dependencies", () =>
+                formatDependencies(
+                  pathName,
+                  Object.assign({}, deps.devDependencies, deps.dependencies)
+                )
+              ),
+              Effect.map(({ pkgJson, dependencies }) => [
+                [
+                  `${pkgJson.name}@${pkgJson.version}`,
+                  {
+                    type: "local" as const,
+                    src: path.join(".", pathName),
+                    name: pkgJson.name,
+                    version: pkgJson.version,
+                    dependencies: dependencies,
+                  },
+                ] as const,
+              ])
+            );
+      }),
+      Effect.map(ReadonlyArray.flatten),
+      Effect.map(ReadonlyRecord.fromEntries)
     )
   ),
   Effect.bind("remote", ({ lockFile }) =>
@@ -163,23 +180,31 @@ export const parsePnpmLock = pipe(
           Option.fromNullable,
           Option.match({
             onNone: () => ({}),
-            onSome: ReadonlyRecord.map(([name, version]) =>
-              fixVersionStr(version)
-            ),
+            onSome: ReadonlyRecord.map((version, name) => {
+              console.log("Fixing version string in remote: ", name, version);
+              return fixVersionStr(version);
+            }),
           })
         );
 
         return pipe(
           Effect.Do,
-          Effect.map(({}) => ({
-            type: "remote" as const,
-            src: srcForPackage(name, version, pkg.resolution),
-            name,
-            version,
-            dependencies,
-          }))
+          Effect.map(({}) => [
+            [
+              `${name}@${version}`,
+              {
+                type: "remote" as const,
+                src: srcForPackage(name, version, pkg.resolution),
+                name,
+                version,
+                dependencies,
+              },
+            ] as const,
+          ])
         );
-      })
+      }),
+      Effect.map(ReadonlyArray.flatten),
+      Effect.map(ReadonlyRecord.fromEntries)
     )
   ),
   Effect.map(({ local, remote, lockFile }) => ({ local, remote })),
@@ -187,7 +212,6 @@ export const parsePnpmLock = pipe(
   Effect.flatMap(
     Either.match({
       onLeft: (e) => {
-        //console.log("error parsing pnpm lock file", e);
         if (e.type === "ParsePnpmLockError") {
           console.log("error parsing pnpm lock file", e);
           console.error(formatErrors(e.value.errors));

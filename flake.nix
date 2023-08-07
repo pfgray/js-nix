@@ -35,8 +35,7 @@
           # js-builds = pkgs.lib.attrsets.mapAttrs (name: dep: mkNodeModule js-packages.packages dep) ((builtins.trace (builtins.attrNames js-packages-by-name)) js-packages-by-name);
 
           workspaces = (mkWorkspace {
-            lockfile = ./js-nix-lock.json;
-            context = ./.;
+            modules = ./js-modules.nix;
           });
           
           jsPackages = builtins.mapAttrs (

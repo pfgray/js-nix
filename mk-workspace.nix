@@ -9,21 +9,19 @@ let
   # };
 
   # makes a node module for
-  mkWorkspace = { lockfile, context }:
+  mkWorkspace = { modules }:
     let
-      packages = builtins.fromJSON (builtins.readFile lockfile);
-      local = builtins.mapAttrs (name: l: l // {
-        src = context + l.src;
-      }) packages.local;
+      packages = import modules;
+
       remote = builtins.mapAttrs (name: r: (r // {
         src = fetchurl {
           inherit (r.src) name url hash;
         };
       })) packages.remote;
     in {
-      local = local;
-      remote = remote;
-      all = local // remote;
+      inherit (packages) local;
+      inherit remote;
+      all = packages.local // remote;
     };
 
 in mkWorkspace

@@ -23,6 +23,7 @@ import { flow } from "effect/Function";
 import { read } from "fs";
 import { taggedError } from "../../taggedError";
 import { formatErrors } from "@effect/schema/TreeFormatter";
+import { ParsedLockFile } from "../../ParsedPackage";
 
 const fixVersionStr = (versionString: string) => {
   return versionString.split("(")[0];
@@ -117,17 +118,12 @@ export const parsePnpmLock = pipe(
   readUtf8File("pnpm-lock.yaml"),
   Effect.flatMap(parseYaml),
   Effect.flatMap((lockFileRaw) => {
-    console.log("Uhhh", JSON.stringify(lockFileRaw as any, null, 2));
     return pipe(
       S.parse(PnpmLockSchema)(lockFileRaw, { onExcessProperty: "ignore" }),
       Effect.mapError(taggedError("ParsePnpmLockError"))
     );
   }),
   Effect.map((lockFile) => {
-    console.log(
-      "Got dependencies",
-      JSON.stringify(lockFile.packages["/yargs@16.2.0"], null, 2)
-    );
     return { lockFile };
   }),
   Effect.bind("local", ({ lockFile }) =>
@@ -181,7 +177,6 @@ export const parsePnpmLock = pipe(
           Option.match({
             onNone: () => ({}),
             onSome: ReadonlyRecord.map((version, name) => {
-              console.log("Fixing version string in remote: ", name, version);
               return fixVersionStr(version);
             }),
           })
@@ -207,7 +202,9 @@ export const parsePnpmLock = pipe(
       Effect.map(ReadonlyRecord.fromEntries)
     )
   ),
-  Effect.map(({ local, remote, lockFile }) => ({ local, remote })),
+  Effect.map(
+    ({ local, remote, lockFile }): ParsedLockFile => ({ local, remote })
+  ),
   Effect.either,
   Effect.flatMap(
     Either.match({

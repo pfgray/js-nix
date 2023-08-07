@@ -1,3 +1,8 @@
+export type ParsedLockFile = {
+  local: Record<string, Extract<ParsedPackage, { type: "local" }>>;
+  remote: Record<string, Extract<ParsedPackage, { type: "remote" }>>;
+};
+
 export type ParsedPackage = {
   name: string;
   version: string;

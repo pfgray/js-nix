@@ -3,6 +3,7 @@ import { readUtf8File, stat, writeUtf8File } from "./fs";
 import { parsePnpmLock } from "./converters/pnpm/pnpmConverter";
 import { formatErrors } from "@effect/schema/TreeFormatter";
 import * as adt from "ts-adt/MakeADT";
+import { renderParsedLockFile } from "./renderParsedLockFile";
 
 const program = pipe(
   parsePnpmLock,
@@ -10,7 +11,8 @@ const program = pipe(
     Option.match({
       onNone: () => Effect.succeed({}),
       onSome: (pnpmLock) =>
-        writeUtf8File("js-nix-lock.json", JSON.stringify(pnpmLock, null, 2)),
+        // writeUtf8File("js-nix-lock.json", JSON.stringify(pnpmLock, null, 2)),
+        writeUtf8File("js-modules.nix", renderParsedLockFile(pnpmLock)),
     })
   )
 );

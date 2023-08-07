@@ -102,7 +102,7 @@ let
       replaceSlashes = str: builtins.replaceStrings ["/"] ["-"] str;
       removeFirstAtSign = str: if lib.strings.hasPrefix "@" str then substringFrom 1 str else str;
       fixName = name: removeFirstAtSign (replaceSlashes name);
-    in builtins.trace (builtins.toString pkg.src) (stdenv.mkDerivation {
+    in stdenv.mkDerivation {
       name = "${pkg.name}-${pkg.version}";
       buildInputs = [nodejs];
       src = pkg.src;
@@ -122,7 +122,7 @@ let
         mkdir -p $out/node_modules
         cp -R node_modules/* $out/node_modules
       '';
-    });
+    };
 
   mkNodeModule = pkgs: pkg:
     (if pkg.type == "remote" then (mkRemoteNodeModule pkgs pkg) else mkLocalNodeModule pkgs pkg);

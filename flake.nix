@@ -42,6 +42,7 @@
             name: builtins.mapAttrs (name: mkNodeModule workspaces.all)
           ) workspaces;
 
+          # rename local packages as to make it easier to reference them
           local = pkgs.lib.attrsets.concatMapAttrs (
             name: value: {
               ${value.name} = mkNodeModule workspaces.all value;
@@ -49,12 +50,7 @@
           ) workspaces.local;
 
         in {
-          # inherit packages;
-          # inherit (js-nix) js-nix;
-          js-nix = js-nix.js-nix;
-          foo = jsPackages.all.${"ts-adt@2.1.2"};
-          # packagesList = builtins.mapAttrs (name: builtins.attrNames) packages;
-          # remotePackages = packages.
-        } // local;
+          inherit (js-nix) js-nix;
+        } // local // jsPackages.remote;
       });
 }

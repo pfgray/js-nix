@@ -69,12 +69,13 @@ let
       ${binLinkCmds}
     '';
 
+  substringFrom = from: str: builtins.substring from (builtins.stringLength str) str;
+  removeFirstAtSign = str: if lib.strings.hasPrefix "@" str then substringFrom 1 str else str;
+  derivationName = pkg: "${removeFirstAtSign pkg.name}_${pkg.version}";
+
   mkRemoteNodeModule = pkgset: pkg:
-    let
-      tarball = (lib.lists.last (lib.splitString "/" pkg.name)) + "-" + pkg.version + ".tgz";
-      url = "https://registry.npmjs.org/${pkg.name}/-/${tarball}";
-    in stdenv.mkDerivation {
-      name = "${pkg.name}-${pkg.version}";
+    stdenv.mkDerivation {
+      name = derivationName pkg;
       src = pkg.src;
 
       buildInputs = [nodejs];
@@ -98,12 +99,10 @@ let
 
   mkLocalNodeModule = pkgset: pkg: 
     let
-      substringFrom = from: str: builtins.substring from (builtins.stringLength str) str;
       replaceSlashes = str: builtins.replaceStrings ["/"] ["-"] str;
-      removeFirstAtSign = str: if lib.strings.hasPrefix "@" str then substringFrom 1 str else str;
       fixName = name: removeFirstAtSign (replaceSlashes name);
     in stdenv.mkDerivation {
-      name = "${pkg.name}-${pkg.version}";
+      name = derivationName pkg;
       buildInputs = [nodejs];
       src = pkg.src;
 

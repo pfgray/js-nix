@@ -30,8 +30,7 @@ export const nodeCallbackToEffect: NodeCallbackToEffect =
   (f: any) =>
   (...args: any[]) => {
     return Effect.async<never, unknown, unknown>((resolve) => {
-      const fargs = args.slice(0, -1);
-      f(...fargs, (error: any, result: any) => {
+      f(...args, (error: any, result: any) => {
         if (error) {
           resolve(Effect.fail(error));
         } else {

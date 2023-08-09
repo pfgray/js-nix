@@ -19,6 +19,7 @@
       dependencies = {
         "gbt" = "0.0.3";
         "typescript" = "5.1.6";
+        "is-positive" = "github.com/kevva/is-positive/97edff6f525f192a3f83cea1944765f769ae2678";
         "left-pad" = "1.3.0";
         "ts-adt" = "2.1.2";
       };
@@ -1883,6 +1884,19 @@
       };
       dependencies = {
         "@types/yoga-layout" = "1.9.2";
+      };
+    };
+    "is-positive@3.1.0" = {
+      type = "remote";
+      version = "3.1.0";
+      name = "is-positive";
+      src = {
+        name = "is-positive-3.1.0.tgz";
+        url = "https://codeload.github.com/kevva/is-positive/tar.gz/97edff6f525f192a3f83cea1944765f769ae2678";
+        hash = "sha512-ImoN9vdC+9CSDxbHJIcYwImhox3/lvLNqKpX5dNXT9O5Vawb+c4wddQ6KXq8FsFMm4WuSc3nxaWG2Q3iBRcFdA==";
+      };
+      dependencies = {
+
       };
     };
   };

@@ -49,8 +49,10 @@
             }
           ) workspaces.local;
 
+
         in {
           inherit (js-nix) js-nix;
+          foo = jsPackages.remote.${"is-positive@3.1.0"};
         } // local // jsPackages.remote;
       });
 }

@@ -16,6 +16,8 @@ import {
   Package,
   PackageResolution,
   PnpmLockSchema,
+  isNpmPackage,
+  isTarballPackage,
 } from "./pnpmYaml";
 import { parseJson } from "../../parseJson";
 import { PackageJsonSchema } from "../../PackageJson";
@@ -24,6 +26,7 @@ import { read } from "fs";
 import { taggedError } from "../../taggedError";
 import { formatErrors } from "@effect/schema/TreeFormatter";
 import { ParsedLockFile } from "../../ParsedPackage";
+import { exec } from "../../exec";
 
 const fixVersionStr = (versionString: string) => {
   return versionString.split("(")[0];
@@ -76,20 +79,29 @@ const readPackageJson = (pkgJsonPath: string) =>
 
 // /@effect-ts/tracing-utils@0.3.0(typescript@5.1.6)
 export const extractNameAndVersionFromPackageKey = (
-  packageKeyIn: string
+  packageKeyIn: string,
+  pkg: Package
 ): { name: string; version: string } => {
-  // remove first slash
-  const packageKey = packageKeyIn.substring(1, packageKeyIn.length);
-  const parts = packageKey.split("@");
-  return packageKey.startsWith("@")
-    ? {
-        name: `@${parts[1]}`,
-        version: parts[2].split("(")[0],
-      }
-    : {
-        name: parts[0],
-        version: parts[1].split("(")[0],
-      };
+  if (isTarballPackage(pkg)) {
+    return { name: pkg.name, version: pkg.version };
+  } else if (isNpmPackage(pkg)) {
+    // remove first slash
+    const packageKey = packageKeyIn.startsWith("/")
+      ? packageKeyIn.substring(1, packageKeyIn.length)
+      : packageKeyIn;
+    const parts = packageKey.split("@");
+    return packageKey.startsWith("@")
+      ? {
+          name: `@${parts[1]}`,
+          version: parts[2].split("(")[0],
+        }
+      : {
+          name: parts[0],
+          version: parts[1].split("(")[0],
+        };
+  } else {
+    throw new Error("Github packages not supported yet");
+  }
 };
 
 const srcForPackage = (
@@ -98,7 +110,17 @@ const srcForPackage = (
   resolution: PackageResolution
 ) => {
   if ("tarball" in resolution) {
-    throw new Error("Tarball not supported (TODO)");
+    return pipe(
+      exec(
+        `curl -sL ${resolution.tarball} | openssl dgst -binary -sha512 | openssl base64 -A`
+      ),
+      Effect.map(({ stdout }) => ({
+        name: `${name}-${version}.tgz`,
+        url: resolution.tarball,
+        hash: `sha512-${stdout}`,
+      }))
+    );
+    // throw new Error("Tarball not supported (TODO)");
     // return resolution.tarball;
   } else if ("commit" in resolution) {
     throw new Error("Commit not supported (TODO)");
@@ -106,11 +128,11 @@ const srcForPackage = (
   } else {
     const parts = name.split("/");
     const tarball = `${parts[parts.length - 1]}-${version}.tgz`;
-    return {
+    return Effect.succeed({
       name: tarball,
       url: `https://registry.npmjs.org/${name}/-/${tarball}`,
       hash: resolution.integrity,
-    };
+    });
   }
 };
 
@@ -168,8 +190,10 @@ export const parsePnpmLock = pipe(
       ReadonlyRecord.toEntries,
       Effect.forEach(([packageKey, pkg]) => {
         // packageKey is something like: /@effect-ts/tracing-utils@0.3.0(typescript@5.1.6)
-        const { name, version } =
-          extractNameAndVersionFromPackageKey(packageKey);
+        const { name, version } = extractNameAndVersionFromPackageKey(
+          packageKey,
+          pkg
+        );
 
         const dependencies = pipe(
           pkg.dependencies,
@@ -184,12 +208,15 @@ export const parsePnpmLock = pipe(
 
         return pipe(
           Effect.Do,
-          Effect.map(({}) => [
+          Effect.bind("src", () =>
+            srcForPackage(name, version, pkg.resolution)
+          ),
+          Effect.map(({ src }) => [
             [
               `${name}@${version}`,
               {
                 type: "remote" as const,
-                src: srcForPackage(name, version, pkg.resolution),
+                src,
                 name,
                 version,
                 dependencies,

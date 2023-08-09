@@ -50,6 +50,10 @@ Effect.runCallback(
                   console.error(`Error parsing yaml text:`);
                   console.error(context.yamlString);
                 },
+                ExecError: (err) => {
+                  console.error(`Error executing command: ${err.context.cmd}`);
+                  console.error(err.value);
+                },
               })
             ),
           Interrupt: ({}) => console.log("interrupt", cause),

@@ -1,8 +1,0 @@
-{
-  packages = [
-    {
-      type = "npm";
-      url = "";
-    }
-  ];
-}

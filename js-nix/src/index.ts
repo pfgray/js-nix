@@ -54,6 +54,9 @@ Effect.runCallback(
                   console.error(`Error executing command: ${err.context.cmd}`);
                   console.error(err.value);
                 },
+                GithubDependencyError: ({ value }) => {
+                  console.error(`Error resolving GH dependency: ${value}`);
+                },
               })
             ),
           Interrupt: ({}) => console.log("interrupt", cause),

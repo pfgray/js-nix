@@ -26,7 +26,6 @@
           ];
         };
         packages = let
-
           mkNodeModule = pkgs.callPackage ./mk-node-module.nix {};
           mkWorkspace = pkgs.callPackage ./mk-workspace.nix {};
 
@@ -37,22 +36,9 @@
           workspaces = (mkWorkspace {
             modules = ./js-modules.nix;
           });
-          
-          jsPackages = builtins.mapAttrs (
-            name: builtins.mapAttrs (name: mkNodeModule workspaces.all)
-          ) workspaces;
-
-          # rename local packages as to make it easier to reference them
-          local = pkgs.lib.attrsets.concatMapAttrs (
-            name: value: {
-              ${value.name} = mkNodeModule workspaces.all value;
-            }
-          ) workspaces.local;
-
 
         in {
           inherit (js-nix) js-nix;
-          foo = jsPackages.remote.${"is-positive@3.1.0"};
-        } // local // jsPackages.remote;
+        } // workspaces.packages;
       });
 }

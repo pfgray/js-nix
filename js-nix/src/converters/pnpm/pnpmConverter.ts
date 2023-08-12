@@ -15,6 +15,7 @@ import {
   ImporterDependencyMap,
   Package,
   PackageResolution,
+  PnpmLock,
   PnpmLockSchema,
   isNpmPackage,
   isTarballPackage,
@@ -32,7 +33,60 @@ const fixVersionStr = (versionString: string) => {
   return versionString.split("(")[0];
 };
 
+const resolveDependencyVersion2 = (lockFile: PnpmLock, pathName: string) => {};
+
+type ErrorFrom<R> = R extends Effect.Effect<any, infer E, any> ? E : never;
+
+const resolveGithubDependencyVersion = (
+  lockFile: PnpmLock,
+  name: string,
+  version: string
+) =>
+  pipe(
+    lockFile.packages[version],
+    Option.fromNullable,
+    Option.filter(isTarballPackage),
+    Option.map((pkg) => pkg.version),
+    Either.fromOption(() =>
+      taggedError("GithubDependencyError")({
+        msg: "Could not find github dependency",
+        version,
+      })
+    ),
+    Either.match({
+      onLeft: (e) => Effect.fail(e),
+      onRight: (version) => Effect.succeed([name, version] as const),
+    })
+  );
+
+type ResolveDependencyVersionError =
+  | ErrorFrom<ReturnType<typeof resolveGithubDependencyVersion>>
+  | ErrorFrom<ReturnType<typeof readPackageJson>>;
+const resolveDependencyVersion =
+  (lockFile: PnpmLock, pathName: string) =>
+  ([name, { version }]: [string, { version: string }]): Effect.Effect<
+    never,
+    ResolveDependencyVersionError,
+    readonly [string, string]
+  > => {
+    if (version.startsWith("link:")) {
+      return pipe(
+        readPackageJson(path.join(pathName, version.slice(5), "package.json")),
+        Effect.map((p) => [name, p.version] as const)
+      );
+    } else if (version.startsWith("github.com")) {
+      console.log(
+        "getting version from github dependency",
+        lockFile.packages[version]
+      );
+      return resolveGithubDependencyVersion(lockFile, name, version);
+    } else {
+      return Effect.succeed([name, fixVersionStr(version)] as const);
+    }
+  };
+
 const formatDependencies = (
+  lockFile: PnpmLock,
   pathName: string,
   dependencies?: ImporterDependencyMap
 ) => {
@@ -42,18 +96,7 @@ const formatDependencies = (
     Option.map(
       flow(
         ReadonlyRecord.toEntries,
-        Effect.forEach(([name, { version }]) => {
-          if (version.startsWith("link:")) {
-            return pipe(
-              readPackageJson(
-                path.join(pathName, version.slice(5), "package.json")
-              ),
-              Effect.map((p) => [name, p.version] as const)
-            );
-          } else {
-            return Effect.succeed([name, fixVersionStr(version)] as const);
-          }
-        }),
+        Effect.forEach(resolveDependencyVersion(lockFile, pathName)),
         Effect.map(ReadonlyRecord.fromEntries)
       )
     ),
@@ -162,6 +205,7 @@ export const parsePnpmLock = pipe(
               ),
               Effect.bind("dependencies", () =>
                 formatDependencies(
+                  lockFile,
                   pathName,
                   Object.assign({}, deps.devDependencies, deps.dependencies)
                 )
@@ -201,7 +245,20 @@ export const parsePnpmLock = pipe(
           Option.match({
             onNone: () => ({}),
             onSome: ReadonlyRecord.map((version, name) => {
-              return fixVersionStr(version);
+              // if the version starts with "github.com"
+              // then look it up in
+
+              if (version.startsWith("github.com")) {
+                return pipe(
+                  lockFile.packages[version],
+                  Option.fromNullable,
+                  Option.filter(isTarballPackage),
+                  Option.map((pkg) => pkg.version),
+                  Option.getOrElse(() => version)
+                );
+              } else {
+                return fixVersionStr(version);
+              }
             }),
           })
         );

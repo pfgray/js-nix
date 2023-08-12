@@ -19,7 +19,7 @@
       dependencies = {
         "gbt" = "0.0.3";
         "typescript" = "5.1.6";
-        "is-positive" = "github.com/kevva/is-positive/97edff6f525f192a3f83cea1944765f769ae2678";
+        "is-positive" = "3.1.0";
         "left-pad" = "1.3.0";
         "ts-adt" = "2.1.2";
       };

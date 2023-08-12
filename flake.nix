@@ -13,10 +13,14 @@
           inherit system;
         }; 
         js-nix = pkgs.callPackage ./js-nix {};
+        mkWorkspace = pkgs.callPackage ./mk-workspace.nix {};
         convert = pkgs.writeShellScriptBin "convert" ''
           ${pkgs.yq-go}/bin/yq -o=json eval pnpm-lock.yaml > pnpm-lock.json
         '';
       in {
+        lib = {
+          mkWorkspace = mkWorkspace;
+        };
         
         devShell = pkgs.mkShell {
           packages = with pkgs; [
@@ -26,12 +30,6 @@
           ];
         };
         packages = let
-          mkNodeModule = pkgs.callPackage ./mk-node-module.nix {};
-          mkWorkspace = pkgs.callPackage ./mk-workspace.nix {};
-
-          # js-packages = import ./js-packages.nix;
-          # js-packages-by-name = builtins.mapAttrs (name: builtins.head) (builtins.groupBy (pkg: pkg.name) js-packages.packages);
-          # js-builds = pkgs.lib.attrsets.mapAttrs (name: dep: mkNodeModule js-packages.packages dep) ((builtins.trace (builtins.attrNames js-packages-by-name)) js-packages-by-name);
 
           workspaces = (mkWorkspace {
             modules = ./js-modules.nix;

@@ -94,6 +94,13 @@ let
           npm run-script postinstall
         fi
         cp -R ./ $out
+
+        # self-referential node_module link to work around
+        # a bug in typescript that doesn't follow symlinks
+        echo "building self-referential node_module link for ${pkg.name}"
+        echo "ln -s $out $out/node_modules/${pkg.name}"
+        mkdir -p $out/node_modules/${removeLastPathSegment pkg.name}
+        ln -s $out $out/node_modules/${pkg.name}
       '';
     };
 

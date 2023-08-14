@@ -80,10 +80,14 @@ let
 
       buildInputs = [nodejs];
 
+      dontInstall = true;
+      dontFixup = true;
+
       buildPhase = ''
         export HOME=$(pwd)
         mkdir node_modules
         ${linkDeps pkgset "node_modules" pkg}
+
         if ${hasScript "preinstall"}; then
           npm run-script preinstall
         fi
@@ -113,12 +117,12 @@ let
       buildInputs = [nodejs];
       src = pkg.src;
 
+      dontFixup = true;
+
       buildPhase = ''
         export HOME=$(pwd)
         mkdir node_modules
-        echo "current working directory is: $PWD"
         ${linkDeps pkgset "node_modules" pkg}
-        # echo "path is: $PATH"
         npm run-script build
         npm pack
         mkdir $out

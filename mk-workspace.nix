@@ -11,12 +11,24 @@ let
       then
         "@${removeVersion (removeFirstChar pkgName)}"
       else removeVersion pkgName;
+
+  fixName = builtins.replaceStrings ["@" "/" "."] ["_" "_" "_"];
+
+  applyModuleOverrides = overrides: modules:
+    let
+      applyOverride = moduleName: module:
+        if builtins.hasAttr moduleName overrides
+        then
+          overrides.${moduleName} module
+        else module;
+    in
+      builtins.mapAttrs applyOverride modules;
   # makes a node module for
-  mkWorkspace = { modules }:
+  mkWorkspace = { modules, overrideModules ? {} }:
     let
       mkNodeModule = callPackage ./mk-node-module.nix {};
 
-      packagesMetadata = import modules;
+      packagesMetadata = builtins.mapAttrs (type: applyModuleOverrides overrideModules) (import modules);
 
       fixedRemoteMetadata = builtins.mapAttrs (name: r: (r // {
         src = fetchurl {
@@ -29,6 +41,12 @@ let
       jsModules = builtins.mapAttrs (
         type: builtins.mapAttrs (name: mkNodeModule allMetadata)
       ) packagesMetadata;
+
+      remote = lib.attrsets.concatMapAttrs (
+        name: value: {
+          ${fixName (value.name + "_" + value.version)} = mkNodeModule allMetadata value;
+        }
+      ) fixedRemoteMetadata;
 
       # rename local packages as to make it easier to reference them
       local = lib.attrsets.concatMapAttrs (
@@ -57,6 +75,7 @@ let
       # node_modules: derivation
       #
       packages = local;
+      remotePackages = remote;
     };
 
 in mkWorkspace

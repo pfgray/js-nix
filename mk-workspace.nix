@@ -39,19 +39,19 @@ let
       allMetadata = packagesMetadata.local // fixedRemoteMetadata;
 
       jsModules = builtins.mapAttrs (
-        type: builtins.mapAttrs (name: mkNodeModule allMetadata)
+        type: builtins.mapAttrs (name: mkNodeModule [] allMetadata)
       ) packagesMetadata;
 
       remote = lib.attrsets.concatMapAttrs (
         name: value: {
-          ${fixName (value.name + "_" + value.version)} = mkNodeModule allMetadata value;
+          ${fixName (value.name + "_" + value.version)} = mkNodeModule [] allMetadata value;
         }
       ) fixedRemoteMetadata;
 
       # rename local packages as to make it easier to reference them
       local = lib.attrsets.concatMapAttrs (
         name: value: {
-          ${value.name} = mkNodeModule allMetadata value;
+          ${value.name} = mkNodeModule [] allMetadata value;
         }
       ) packagesMetadata.local;
 

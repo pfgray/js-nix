@@ -11,7 +11,7 @@ let
 
   hasScript = scriptName: "test \"$(${jq}/bin/jq -e -r '.scripts | .${scriptName} | length' < package.json)\" -gt 0";
 
-  linkDeps = pkgset: node_modules_folder: pkg:
+  linkDeps = dep_chain: pkgset: node_modules_folder: pkg:
     let
       pkgs = (builtins.attrValues (pkgset));
 
@@ -26,7 +26,7 @@ let
 
       linkDep = node_modules_folder: pkg: 
         let
-          nm = mkNodeModule pkgset pkg;
+          nm = mkNodeModule dep_chain pkgset pkg;
           pkgJson = lib.importJSON "${nm}/package.json";
           bins =
             if builtins.hasAttr "bin" pkgJson
@@ -43,7 +43,8 @@ let
                       else throw ("Package ${packageStr pkg} has a bin section in package.json, but it's not a string or an object.")
               else [];
           binFolder = node_modules_folder + "/.bin";
-        in {
+        in if builtins.elem (packageStr pkg) dep_chain
+        then throw ("Dependency Cycle encountered while building ${packageStr pkg}, [${builtins.concatStringsSep " -> " dep_chain} -> ${packageStr pkg}]") else {
           binLinksCmd =
             scriptLines (builtins.map (bin: (''
               ln -s ${bin} ${binFolder}/${builtins.baseNameOf bin}
@@ -73,7 +74,7 @@ let
   removeFirstAtSign = str: if lib.strings.hasPrefix "@" str then substringFrom 1 str else str;
   derivationName = pkg: "${removeFirstAtSign pkg.name}_${pkg.version}";
 
-  mkRemoteNodeModule = pkgset: pkg:
+  mkRemoteNodeModule = dep_chain: pkgset: pkg:
     stdenv.mkDerivation {
       name = derivationName pkg;
       src = pkg.src;
@@ -86,7 +87,7 @@ let
       buildPhase = ''
         export HOME=$(pwd)
         mkdir node_modules
-        ${linkDeps pkgset "node_modules" pkg}
+        ${linkDeps (dep_chain ++ [(packageStr pkg)]) pkgset "node_modules" pkg}
 
         if ${hasScript "preinstall"}; then
           npm run-script preinstall
@@ -108,7 +109,7 @@ let
       '';
     };
 
-  mkLocalNodeModule = pkgset: pkg: 
+  mkLocalNodeModule = dep_chain: pkgset: pkg:
     let
       replaceSlashes = str: builtins.replaceStrings ["/"] ["-"] str;
       fixName = name: removeFirstAtSign (replaceSlashes name);
@@ -122,7 +123,7 @@ let
       buildPhase = ''
         export HOME=$(pwd)
         mkdir node_modules
-        ${linkDeps pkgset "node_modules" pkg}
+        ${linkDeps (dep_chain ++ [(packageStr pkg)]) pkgset "node_modules" pkg}
         npm run-script build
         npm pack
         mkdir $out
@@ -134,6 +135,6 @@ let
       '';
     };
 
-  mkNodeModule = pkgs: pkg:
-    (if pkg.type == "remote" then (mkRemoteNodeModule pkgs pkg) else mkLocalNodeModule pkgs pkg);
+  mkNodeModule = dep_chain: pkgs: pkg:
+    if pkg.type == "remote" then (mkRemoteNodeModule dep_chain pkgs pkg) else mkLocalNodeModule dep_chain pkgs pkg;
 in mkNodeModule

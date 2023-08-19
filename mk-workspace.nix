@@ -24,7 +24,11 @@ let
     in
       builtins.mapAttrs applyOverride modules;
   # makes a node module for
-  mkWorkspace = { modules, overrideModules ? {} }:
+  mkWorkspace = {
+    modules,
+    overrideModules ? {},
+    includePeerDependencies ? false
+  }:
     let
       mkNodeModule = callPackage ./mk-node-module.nix {};
 
@@ -39,19 +43,19 @@ let
       allMetadata = packagesMetadata.local // fixedRemoteMetadata;
 
       jsModules = builtins.mapAttrs (
-        type: builtins.mapAttrs (name: mkNodeModule [] allMetadata)
+        type: builtins.mapAttrs (name: mkNodeModule includePeerDependencies [] allMetadata)
       ) packagesMetadata;
 
       remote = lib.attrsets.concatMapAttrs (
         name: value: {
-          ${fixName (value.name + "_" + value.version)} = mkNodeModule [] allMetadata value;
+          ${fixName (value.name + "_" + value.version)} = mkNodeModule includePeerDependencies [] allMetadata value;
         }
       ) fixedRemoteMetadata;
 
       # rename local packages as to make it easier to reference them
       local = lib.attrsets.concatMapAttrs (
         name: value: {
-          ${value.name} = mkNodeModule [] allMetadata value;
+          ${value.name} = mkNodeModule includePeerDependencies [] allMetadata value;
         }
       ) packagesMetadata.local;
 

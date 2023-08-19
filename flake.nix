@@ -37,6 +37,7 @@
 
         in {
           inherit (js-nix) js-nix;
+          excludePeerDeps = pkg: pkg // { includePeerDependencies = false; };
         } // workspaces.packages;
       });
 }

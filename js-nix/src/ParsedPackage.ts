@@ -14,6 +14,7 @@ export type ParsedPackage = {
     }
   | {
       type: "remote";
+      peerDependencies: string[];
       src: {
         name?: string;
         url: string;

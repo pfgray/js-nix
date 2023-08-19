@@ -47,6 +47,7 @@ const NpmPackageSchema = S.struct({
     integrity: S.string,
   }),
   dependencies: S.optional(S.record(S.string, S.string)),
+  peerDependencies: S.optional(S.record(S.string, S.string)),
 });
 
 const TarballPackageSchema = S.struct({
@@ -56,6 +57,7 @@ const TarballPackageSchema = S.struct({
   name: S.string,
   version: S.string,
   dependencies: S.optional(S.record(S.string, S.string)),
+  peerDependencies: S.optional(S.record(S.string, S.string)),
 });
 
 const GitPackageSchema = S.struct({
@@ -64,6 +66,7 @@ const GitPackageSchema = S.struct({
     repo: S.string,
   }),
   dependencies: S.optional(S.record(S.string, S.string)),
+  peerDependencies: S.optional(S.record(S.string, S.string)),
 });
 
 export interface TarballPackage extends S.To<typeof TarballPackageSchema> {}

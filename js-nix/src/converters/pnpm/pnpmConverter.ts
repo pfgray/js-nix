@@ -6,6 +6,7 @@ import {
   ReadonlyArray,
   Option,
   Either,
+  Tuple,
 } from "effect";
 import { readUtf8File } from "../../fs";
 import * as yaml from "js-yaml";
@@ -239,6 +240,15 @@ export const parsePnpmLock = pipe(
           pkg
         );
 
+        const peerDependencies = pipe(
+          pkg.peerDependencies,
+          Option.fromNullable,
+          Option.map(
+            flow(ReadonlyRecord.toArray, ReadonlyArray.map(Tuple.getFirst))
+          ),
+          Option.getOrElse(() => ReadonlyArray.empty())
+        );
+
         const dependencies = pipe(
           pkg.dependencies,
           Option.fromNullable,
@@ -276,6 +286,7 @@ export const parsePnpmLock = pipe(
                 src,
                 name,
                 version,
+                peerDependencies,
                 dependencies,
               },
             ] as const,

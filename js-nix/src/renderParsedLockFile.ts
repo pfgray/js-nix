@@ -1,3 +1,4 @@
+import { ReadonlyArray, ReadonlyRecord, pipe } from "effect";
 import { ParsedLockFile } from "./ParsedPackage";
 
 export const renderParsedLockFile = (parsedLockFile: ParsedLockFile) => {
@@ -20,13 +21,31 @@ ${renderedDependencies}
     })
     .join("\n");
 
+  const renderSpaces = (items: string[]) => {
+    if (items.length === 0) {
+      return items.join("\n");
+    } else {
+      return "\n" + items.join("\n") + "\n      ";
+    }
+  };
+
   const renderedRemote = Object.entries(parsedLockFile.remote)
     .map(([name, pkg]) => {
-      const renderedDependencies = Object.entries(pkg.dependencies)
-        .map(([name, version]) => {
+      const renderedDependencies = pipe(
+        pkg.dependencies,
+        ReadonlyRecord.toEntries,
+        ReadonlyArray.map(([name, version]) => {
           return `        "${name}" = "${version}";`;
-        })
-        .join("\n");
+        }),
+        renderSpaces
+      );
+      const renderedPeerDependencies = pipe(
+        pkg.peerDependencies,
+        ReadonlyArray.map((name) => {
+          return `        "${name}"`;
+        }),
+        renderSpaces
+      );
       return `    "${name}" = {
       type = "remote";
       version = "${pkg.version}";
@@ -36,9 +55,8 @@ ${renderedDependencies}
         url = "${pkg.src.url}";
         hash = "${pkg.src.hash}";
       };
-      dependencies = {
-${renderedDependencies}
-      };
+      dependencies = {${renderedDependencies}};
+      peerDependencies = [${renderedPeerDependencies}];
     };`;
     })
     .join("\n");

@@ -46,12 +46,19 @@ let
               then
                 if builtins.isString pkgJson.bin
                   then
-                    ["${nm}/${pkgJson.bin}"]
+                    [{
+                      name = builtins.baseNameOf pkgJson.bin;
+                      file = pkgJson.bin;
+                    }]
                   else
                     if builtins.isAttrs pkgJson.bin
                       then
                         lib.attrsets.attrValues (
-                          lib.attrsets.mapAttrs (name: path: "${nm}/${path}") pkgJson.bin
+                          builtins.mapAttrs (key: value: {
+                            name = key;
+                            file = value;
+                          })
+                          pkgJson.bin
                         )
                       else throw ("Package ${packageStr pkg} has a bin section in package.json, but it's not a string or an object.")
               else [];
@@ -59,7 +66,7 @@ let
         in
           if !includePeerDepsWithOverride && (pkgIsPeerDependency pkg)
               # noop
-              then builtins.trace "skipping linking ${packageStr pkg} because it's a peer dependency" {
+              then {
                 binLinksCmd = "";
                 moduleLinkCmd = "";
               }
@@ -69,17 +76,17 @@ let
             else {
               binLinksCmd =
                 scriptLines (builtins.map (bin: (''
-                  ln -s ${bin} ${binFolder}/${builtins.baseNameOf bin}
+                  echo "ln -s $PWD/${node_modules_folder}/${pkg.name}/${bin.file} $PWD/${binFolder}/${bin.name}"
+                  ln -s $PWD/${node_modules_folder}/${pkg.name}/${bin.file} $PWD/${binFolder}/${bin.name}
                 '')) bins);
               moduleLinkCmd = ''
                 # ensure directories here
                 mkdir -p ${node_modules_folder}/${removeLastPathSegment pkg.name}
-                ln -s ${nm} ${node_modules_folder}/${pkg.name}
-                # if there's a bin section in package.json, link the binaries
+                cp -R ${nm} ${node_modules_folder}/${pkg.name}
               '';
             };
 
-      moduleLinks = builtins.trace "linking deps of ${packageStr pkg}" (builtins.map (linkDep node_modules_folder) (
+      moduleLinks = (builtins.map (linkDep node_modules_folder) (
         (builtins.attrValues (builtins.mapAttrs (findPkgByNameAndVersion) pkg.dependencies))
       ));
 
@@ -120,14 +127,14 @@ let
         if ${hasScript "postinstall"}; then
           npm run-script postinstall
         fi
-        cp -R ./ $out
+        cp -RL ./ $out
 
         # self-referential node_module link to work around
         # a bug in typescript that doesn't follow symlinks
-        echo "building self-referential node_module link for ${pkg.name}"
-        echo "ln -s $out $out/node_modules/${pkg.name}"
-        mkdir -p $out/node_modules/${removeLastPathSegment pkg.name}
-        ln -s $out $out/node_modules/${pkg.name}
+        # echo "building self-referential node_module link for ${pkg.name}"
+        # echo "ln -s $out $out/node_modules/${pkg.name}"
+        # mkdir -p $out/node_modules/${removeLastPathSegment pkg.name}
+        # ln -s $out $out/node_modules/${pkg.name}
       '';
     };
 

@@ -14,6 +14,8 @@
         }; 
         js-nix = pkgs.callPackage ./js-nix {};
         mkWorkspace = pkgs.callPackage ./mk-workspace.nix {};
+        mkWorkspace2 = pkgs.callPackage ./mk-node-modules.nix {};
+        mkPnpmWorkspace = pkgs.callPackage ./mk-pnpm-workspace.nix {};
         convert = pkgs.writeShellScriptBin "convert" ''
           ${pkgs.yq-go}/bin/yq -o=json eval pnpm-lock.yaml > pnpm-lock.json
         '';
@@ -21,7 +23,7 @@
         lib = {
           mkWorkspace = mkWorkspace;
         };
-        
+
         devShell = pkgs.mkShell {
           packages = with pkgs; [
             nodejs.pkgs.pnpm
@@ -35,9 +37,13 @@
             modules = ./js-modules.nix;
           });
 
+          result = (mkPnpmWorkspace {
+            modules = ./js-modules.nix;
+          });
+
         in {
           inherit (js-nix) js-nix;
-          excludePeerDeps = pkg: pkg // { includePeerDependencies = false; };
-        } // workspaces.packages;
+          # excludePeerDeps = pkg: pkg // { includePeerDependencies = false; };
+        } // result;
       });
 }
